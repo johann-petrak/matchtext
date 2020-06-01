@@ -100,7 +100,7 @@ class TokenMatcher:
                 else:
                     node = node.nodes[token]
             i += 1
-        if append and data:
+        if append and data is not None:
             if node.data:
                 node.data.append(data)
             else:
