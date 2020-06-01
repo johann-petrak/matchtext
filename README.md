@@ -1,5 +1,6 @@
-# python-matchtext
-Library for fast text matching and replacing.
+# Python matchtext
+
+Python 3 package for fast text matching and replacing.
 
 This library implements two fast approaches for matching keywords/gazetteer entries:
 * TokenMatcher: keywords/gazetteer entries are sequences of tokens, optionally associated with some data and 
