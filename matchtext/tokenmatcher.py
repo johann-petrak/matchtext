@@ -172,3 +172,17 @@ class TokenMatcher:
                     i += longest - 1  # we will increment by 1 right after!
             i += 1
         return matches
+
+    def replace(self,  tokens, fromidx=None, toidx=None, getter=None):
+        """
+        Replace any longest sequence of tokens we find. By default the data found for the match is
+        used as is. The getter parameter can be used to specify a function that takes the
+        match and returns a list of replacement tokens. If the getter is a list, that list is always used
+        as a replacement. If the getter is a string, it is used as a single token string that is always used.
+        :param tokens: the sequence of tokens where to find and replace matches
+        :param fromidx:
+        :param toidx:
+        :param getter: a function that takes the match and returns a list of replacement tokens
+        :return: the tokens with all replacements carried out
+        """
+        raise Exception("Not yet implemented")
