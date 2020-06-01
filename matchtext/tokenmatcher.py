@@ -12,7 +12,20 @@ the string corresponding to each element can be retrieved via some getter functi
 import logging
 from collections import namedtuple, defaultdict
 
-Match = namedtuple("Match", ["tokens", "start", "end", "data"])
+Match = namedtuple("Match", ["tokens", "start", "end", "entrydata", "matcherdata"])
+
+
+def thisorthat(this, that):
+    """
+    If this is None takes that otherwise takes this.
+    :param this:
+    :param that:
+    :return:
+    """
+    if this is None:
+        return that
+    else:
+        return this
 
 
 class Node(object):
@@ -32,6 +45,8 @@ class Node(object):
     def __repr__(self):
         return f"Node(isMatch={self.isMatch},data={self.data},continuations={self.continuations})"
 
+# TODO: this is rubbish, just use a proper hash tree
+# so each Node has: isMatch, data, dict
 
 class Continuation(object):
     __slots__ = ("tokens", "data")
@@ -46,11 +61,13 @@ class Continuation(object):
 
 class TokenMatcher:
 
-    def __init__(self, ignorefunc=None, mapfunc=None):
+    def __init__(self, ignorefunc=None, mapfunc=None, matcherdata=None, defaultdata=None):
         """
         Create a TokenMatcher.
         :param ignorefunc: a predicate that returns True for any token that should be ignored.
         :param mapfunc: a function that returns the string to use for each token.
+        :param matcherdata: data to add to all matches in the matcherdata field
+        :param defaultdata: data to add to matches when the entry data is None
         """
         # for each gazetteer entry, the key is the mapped string and the value is a list of
         # matches or continuations:
@@ -59,6 +76,8 @@ class TokenMatcher:
         self._dict = defaultdict(Node)
         self.ignorefunc = ignorefunc
         self.mapfunc = mapfunc
+        self.defaultdata = defaultdata
+        self.matcherdata = matcherdata
 
     def add(self, entry, data=None):
         """
@@ -95,12 +114,14 @@ class TokenMatcher:
             node.data = data
             node.isMatch = True
 
-    def find(self, tokens, all=True):
+    def find(self, tokens, all=True, fromidx=None, toidx=None):
         """
         Find gazetteer entries in text. Text is either a string or an iterable of strings or
         an iterable of elements where a string can be retrieved using the getter.
         :param text: iterable of tokens (string or something where getter retrieves a string)
         :param all: return all matches, if False only return all longest matches
+        :param fromidx: index where to start finding in tokens
+        :param toidx: index where to stop finding in tokens (this is the last index actually used)
         :return: an iterable of Match. The start/end fields of each Match are the character offsets if
         text is a string, otherwise are the token offsets.
         """
@@ -113,7 +134,8 @@ class TokenMatcher:
                 node = self._dict[token]
                 thismatches = []
                 if node.isMatch:
-                    thismatches.append(Match([token], i, i+1, node.data))
+                    thismatches.append(
+                        Match([token], i, i+1, thisorthat(node.data, self.defaultdata), self.matcherdata))
                 if node.continuations:
 
                     # for each continuation, check if we can match it and get the match
@@ -143,7 +165,9 @@ class TokenMatcher:
                             break
                     # now if k == len(ctoks) we must have found a match of length k+1
                     if k == len(ctoks):
-                        thismatches.append(Match(thistokens, i, i + k + 1, cont.data))
+                        thismatches.append(
+                            Match(thistokens, i, i + k + 1,
+                                  thisorthat(cont.data, self.defaultdata), self.matcherdata))
                 for m in thismatches:
                     matches.append(m)
         return matches
@@ -157,7 +181,7 @@ class TokenMatcher:
 if __name__ == "__main__":
     # quick tests
     entries = ["Some", "word", "to", "add", ["some", "word"]]
-    tm = TokenMatcher(mapfunc=str.lower)
+    tm = TokenMatcher(mapfunc=str.lower, matcherdata={"a": 23})
     print("Empty: ", tm.str_debug())
     for i, e in enumerate(entries):
         tm.add(e, data=i)
