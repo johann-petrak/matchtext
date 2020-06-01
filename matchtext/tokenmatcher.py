@@ -35,28 +35,18 @@ class Node(object):
     The continuations attribute contains None or a list of multi token matches that
     start with the first token and the entry data if we have a match (all tokens match).
     """
-    __slots__ = ("isMatch", "data", "continuations")
+    __slots__ = ("isMatch", "data", "nodes")
 
-    def __init__(self, isMatch=None, data=None, continuations=None):
+    def __init__(self, isMatch=None, data=None, nodes=None):
         self.isMatch = isMatch
         self.data = data
-        self.continuations = continuations
+        self.nodes = nodes
 
     def __repr__(self):
-        return f"Node(isMatch={self.isMatch},data={self.data},continuations={self.continuations})"
-
-# TODO: this is rubbish, just use a proper hash tree
-# so each Node has: isMatch, data, dict
-
-class Continuation(object):
-    __slots__ = ("tokens", "data")
-
-    def __init__(self, tokens=[], data=None):
-        self.tokens = tokens
-        self.data = data
-
-    def __repr__(self):
-        return f"Continuation(tokens={self.tokens},data={self.data})"
+        nodes = self.nodes
+        if nodes is not None:
+            nodes = [(t, n) for t, n in nodes.items()]
+        return f"Node(isMatch={self.isMatch},data={self.data},nodes={nodes})"
 
 
 class TokenMatcher:
@@ -89,7 +79,7 @@ class TokenMatcher:
         """
         if isinstance(entry, str):
             entry = [entry]
-        cont = None
+        node = None
         i = 0
         for token in entry:
             if self.mapfunc is not None:
@@ -99,20 +89,16 @@ class TokenMatcher:
             if i == 0:
                 node = self._dict[token]
             else:
-                if node.continuations is None:
-                    conttoks = [token]
-                    node.continuations = [Continuation(tokens=conttoks, data=data)]
+                if node.nodes is None:
+                    node.nodes = defaultdict(Node)
+                    tmpnode = Node()
+                    node.nodes[token] = tmpnode
+                    node = tmpnode
                 else:
-                    # if there are already continuations, just add a new one if we have i==1
-                    if i == 1:
-                        conttoks = [token]
-                        node.continuations.append(Continuation(tokens=conttoks, data=data))
-                    else:
-                        conttoks.append(token)
+                    node = node.nodes[token]
             i += 1
-        if i == 1:
-            node.data = data
-            node.isMatch = True
+        node.data = data
+        node.isMatch = True
 
     def find(self, tokens, all=True, fromidx=None, toidx=None):
         """
@@ -187,7 +173,7 @@ if __name__ == "__main__":
         tm.add(e, data=i)
         print(f"After {i}: ", tm.str_debug())
 
-    t1 = ["This", "contains", "Some", "text"]
-    print("M1: ", tm.find(t1))
-    t2 = ["this", "contains", "some", "word", "of", "text", "to", "add"]
-    print("M2: ", tm.find(t2))
+    #t1 = ["This", "contains", "Some", "text"]
+    #print("M1: ", tm.find(t1))
+    #t2 = ["this", "contains", "some", "word", "of", "text", "to", "add"]
+    #print("M2: ", tm.find(t2))
