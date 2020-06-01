@@ -1,5 +1,10 @@
 # Python matchtext
 
+
+[![PyPi version](https://img.shields.io/pypi/v/matchtext.svg)](https://pypi.python.org/pypi/matchtext/)
+[![Python compatibility](https://img.shields.io/pypi/pyversions/matchtext.svg)](https://pypi.python.org/pypi/matchtext/)
+
+
 **NOTE: at the moment this is still very much in development and large parts are not implemented yet!**
 
 Python 3 package for fast text matching and replacing.
