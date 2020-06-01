@@ -37,8 +37,8 @@ class Node(object):
     """
     __slots__ = ("isMatch", "data", "nodes")
 
-    def __init__(self, isMatch=None, data=None, nodes=None):
-        self.isMatch = isMatch
+    def __init__(self, is_match=None, data=None, nodes=None):
+        self.isMatch = is_match
         self.data = data
         self.nodes = nodes
 
@@ -46,7 +46,7 @@ class Node(object):
         nodes = self.nodes
         if nodes is not None:
             nodes = [(t, n) for t, n in nodes.items()]
-        return f"Node(isMatch={self.isMatch},data={self.data},nodes={nodes})"
+        return f"Node(is_match={self.is_match},data={self.data},nodes={nodes})"
 
 
 class TokenMatcher:
@@ -59,10 +59,6 @@ class TokenMatcher:
         :param matcherdata: data to add to all matches in the matcherdata field
         :param defaultdata: data to add to matches when the entry data is None
         """
-        # for each gazetteer entry, the key is the mapped string and the value is a list of
-        # matches or continuations:
-        # a match is a _Match named tuple which contains only the entry data (if any)
-        # a continuation is a _Continuation tuple which contains the remaining mapped strings to match and the entry data
         self._dict = defaultdict(Node)
         self.ignorefunc = ignorefunc
         self.mapfunc = mapfunc
@@ -104,7 +100,7 @@ class TokenMatcher:
         """
         Find gazetteer entries in text. Text is either a string or an iterable of strings or
         an iterable of elements where a string can be retrieved using the getter.
-        :param text: iterable of tokens (string or something where getter retrieves a string)
+        :param tokens: iterable of tokens (string or something where getter retrieves a string)
         :param all: return all matches, if False only return all longest matches
         :param fromidx: index where to start finding in tokens
         :param toidx: index where to stop finding in tokens (this is the last index actually used)
@@ -116,44 +112,34 @@ class TokenMatcher:
         for i, token in enumerate(tokens):
             if self.mapfunc:
                 token = self.mapfunc(token)
-            if token in self._dict:  # only possible if the token is not ignored!
+            if token in self._dict:  # only possible if the token was not ignored!
                 node = self._dict[token]
                 thismatches = []
+                thistokens = []
                 if node.isMatch:
+                    thistokens.append(token)
                     thismatches.append(
                         Match([token], i, i+1, thisorthat(node.data, self.defaultdata), self.matcherdata))
-                if node.continuations:
-
-                    # for each continuation, check if we can match it and get the match
-                    # TODO: add loop and indent below!!
-                    # TODO: for testing we just get the first continuation
-                    # TODO: matching tokens have to get reset for each continuation
-                    cont = node.continuations[0]
-                    thistokens = [token]
-
-                    # try to match all tokens in continuations with the next tokens
-                    j = i+1   # index into text tokens
-                    ctoks = cont.tokens
-                    k = 0  # index into continuation tokens
-                    while j < l and k < len(ctoks):
+                j = j+1  # index into text tokens
+                while j < l:
+                    if node.nodes:
                         tok = tokens[j]
                         if self.mapfunc:
                             tok = self.mapfunc(tok)
                         if self.ignorefunc and self.ignorefunc(tok):
                             j += 1
                             continue
-                        if tok == ctoks[k]:
+                        if tok in node.nodes:
                             j += 1
-                            k += 1
+                            node = node.nodes[tok]
                             thistokens.append(tok)
+                            if node.is_match:
+                                thismatches.append(
+                                    Match(thistokens, i, i + len(thistokens),
+                                          thisorthat(node.data, self.defaultdata), self.matcherdata))
                             continue
                         else:
                             break
-                    # now if k == len(ctoks) we must have found a match of length k+1
-                    if k == len(ctoks):
-                        thismatches.append(
-                            Match(thistokens, i, i + k + 1,
-                                  thisorthat(cont.data, self.defaultdata), self.matcherdata))
                 for m in thismatches:
                     matches.append(m)
         return matches
