@@ -1,5 +1,7 @@
 # Python matchtext
 
+**NOTE: at the moment this is still very much in development and large parts are not implemented yet!**
+
 Python 3 package for fast text matching and replacing.
 
 This library implements two fast approaches for matching keywords/gazetteer entries:
