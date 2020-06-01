@@ -5,7 +5,7 @@ from matchtext.tokenmatcher import TokenMatcher
 ENTRIES =  ["Some", "word", "to", "add", ["some", "word"], ["some", "word"]]
 
 
-def test_tm1():
+def test_tm_find1():
     tm = TokenMatcher()
     for i, e in enumerate(ENTRIES):
         tm.add(e, data=i, append=False)
@@ -20,7 +20,7 @@ def test_tm1():
     assert m1.matcherdata is None
 
 
-def test_m2():
+def test_tm_find2():
     tm = TokenMatcher(mapfunc=str.lower, matcherdata="x")
     for i, e in enumerate(ENTRIES):
         tm.add(e, data=i, append=True)
@@ -46,3 +46,21 @@ def test_m2():
     assert m.end == 4
     assert m.matcherdata == "x"
 
+
+def test_tm_replace1():
+    tm = TokenMatcher(mapfunc=str.lower)
+    for i, e in enumerate(ENTRIES):
+        tm.add(e, data=i, append=False)
+    t1 = ["this", "contains", "some", "word", "of", "text", "to", "add"]
+    rep = tm.replace(t1)
+    assert rep == ['this', 'contains', 5, 'of', 'text', 2, 3]
+
+
+def test_tm_replace2():
+    tm = TokenMatcher(mapfunc=str.lower)
+    for i, e in enumerate(ENTRIES):
+        tm.add(e, data=i, append=False)
+    t1 = ["THIS", "CONTAINS", "SOME", "WORD", "OF", "TEXT", "TO", "ADD"]
+    rep = tm.replace(t1, getter=lambda x: x.match)
+    assert rep == ['THIS', 'CONTAINS', 'some', 'word', 'OF', 'TEXT', 'to', 'add']
+    assert t1 == ["THIS", "CONTAINS", "SOME", "WORD", "OF", "TEXT", "TO", "ADD"]

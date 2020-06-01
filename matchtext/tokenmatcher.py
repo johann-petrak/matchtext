@@ -179,10 +179,20 @@ class TokenMatcher:
         used as is. The getter parameter can be used to specify a function that takes the
         match and returns a list of replacement tokens. If the getter is a list, that list is always used
         as a replacement. If the getter is a string, it is used as a single token string that is always used.
-        :param tokens: the sequence of tokens where to find and replace matches
+        :param tokens: the sequence of tokens where to find and replace matches. The parameter is left unchanged.
         :param fromidx:
         :param toidx:
         :param getter: a function that takes the match and returns a list of replacement tokens
         :return: the tokens with all replacements carried out
         """
-        raise Exception("Not yet implemented")
+        tokens = tokens.copy()
+        matches = self.find(tokens, fromidx=fromidx, toidx=toidx, all=False, skip=True)
+        # to make it easier to replace slices in the tokens, replace from the end
+        matches = sorted(matches, key=lambda x: x.start, reverse=True)
+        for match in matches:
+            if getter:
+                rep = getter(match)
+            else:
+                rep = [match.entrydata]
+            tokens[match.start:match.end] = rep
+        return tokens
