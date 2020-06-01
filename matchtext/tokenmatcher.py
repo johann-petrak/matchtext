@@ -13,7 +13,6 @@ data and append on each add for the same sequence instead of overwriting existin
 parameter.
 """
 
-import logging
 from collections import namedtuple, defaultdict
 
 Match = namedtuple("Match", ["tokens", "start", "end", "entrydata", "matcherdata"])
@@ -115,6 +114,8 @@ class TokenMatcher:
         """
         Find gazetteer entries in text. Text is either a string or an iterable of strings or
         an iterable of elements where a string can be retrieved using the getter.
+        Note: if fromidx or toidx are bigger than the length of the tokens allows, this is silently
+        ignored.
         :param tokens: iterable of tokens (string or something where getter retrieves a string)
         :param all: return all matches, if False only return longest match
         :param skip: skip forward over longest match (do not return contained/overlapping matches)
@@ -125,8 +126,18 @@ class TokenMatcher:
         """
         matches = []
         l = len(tokens)
-        i = 0
-        while i < l:
+        if fromidx is None:
+            fromidx = 0
+        if toidx is None:
+            toidx = l-1
+        if fromidx >= l:
+            return matches
+        if toidx >= l:
+            toidx = l-1
+        if fromidx > toidx:
+            return matches
+        i = fromidx
+        while i <= toidx:
             token = tokens[i]
             if self.mapfunc:
                 token = self.mapfunc(token)
@@ -188,3 +199,5 @@ if __name__ == "__main__":
     print("M1: ", tm.find(t1))
     t2 = ["this", "contains", "some", "word", "of", "text", "to", "add"]
     print("M2: ", tm.find(t2, all=False, skip=True))
+    t2 = ["this", "contains", "some", "word", "of", "text", "to", "add"]
+    print("M3: ", tm.find(t2, all=False, skip=True, fromidx=3))
