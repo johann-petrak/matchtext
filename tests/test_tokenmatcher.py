@@ -26,7 +26,7 @@ def test_m2():
         tm.add(e, data=i, append=True)
     t1 = ["this", "contains", "some", "word", "of", "text", "to", "add"]
     ms = tm.find(t1, all=True, skip=False)
-    print("Matches:", ms)
+    # print("Matches:", ms)
     assert len(ms) == 5
     m = ms[0]
     assert m.entrydata == [0]
@@ -34,13 +34,13 @@ def test_m2():
     assert m.end == 3
     assert m.matcherdata == "x"
     m = ms[1]
-    assert m.tokens == ["some", "word"]
+    assert m.match == ["some", "word"]
     assert m.entrydata == [4, 5]
     assert m.start == 2
     assert m.end == 4
     assert m.matcherdata == "x"
     m = ms[2]
-    assert m.tokens == ["word"]
+    assert m.match == ["word"]
     assert m.entrydata == [1]
     assert m.start == 3
     assert m.end == 4

@@ -14,21 +14,9 @@ parameter.
 """
 
 from collections import namedtuple, defaultdict
+from .utils import thisorthat
 
-Match = namedtuple("Match", ["tokens", "start", "end", "entrydata", "matcherdata"])
-
-
-def thisorthat(this, that):
-    """
-    If this is None takes that otherwise takes this.
-    :param this:
-    :param that:
-    :return:
-    """
-    if this is None:
-        return that
-    else:
-        return this
+Match = namedtuple("Match", ["match", "start", "end", "entrydata", "matcherdata"])
 
 
 class Node(object):
@@ -184,20 +172,3 @@ class TokenMatcher:
                     i += longest - 1  # we will increment by 1 right after!
             i += 1
         return matches
-
-
-if __name__ == "__main__":
-    # quick tests
-    entries = ["Some", "word", "to", "add", ["some", "word"], ["some", "word"]]
-    tm = TokenMatcher(mapfunc=str.lower, matcherdata={"a": 23})
-    print("Empty: ", Node.dict_repr(tm.nodes))
-    for i, e in enumerate(entries):
-        tm.add(e, data=i, append=True)
-        print(f"After {i}: ", Node.dict_repr(tm.nodes))
-
-    t1 = ["This", "contains", "Some", "text"]
-    print("M1: ", tm.find(t1))
-    t2 = ["this", "contains", "some", "word", "of", "text", "to", "add"]
-    print("M2: ", tm.find(t2, all=False, skip=True))
-    t2 = ["this", "contains", "some", "word", "of", "text", "to", "add"]
-    print("M3: ", tm.find(t2, all=False, skip=True, fromidx=3))
