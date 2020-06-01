@@ -4,9 +4,13 @@ Match tokens or token sequences: here, the minimal element we match is a "token"
 in the gazetteer is seen as a sequence of one or more tokens and the text where we match is also seen as a sequence
 of one or more tokens.
 
-For both the text and a gazetteer entry, if we have a string, that string is first converted to
+For both the text and a mather entry, if we have a string, that string is first converted to
 a list of tokens. If we do not have a string, it should be an iterable of string or an iterable where
 the string corresponding to each element can be retrieved via some getter function.
+
+For each sequence, there can be only one entry/match, but the add method can be made to store a list of
+data and append on each add for the same sequence instead of overwriting existing data with the "append=True"
+parameter.
 """
 
 import logging
@@ -31,21 +35,24 @@ def thisorthat(this, that):
 class Node(object):
     """
     Represent an entry in the hash map of entry first tokens.
-    If isMatch is True, that token is already a match and data contains the entry data.
+    If is_match is True, that token is already a match and data contains the entry data.
     The continuations attribute contains None or a list of multi token matches that
     start with the first token and the entry data if we have a match (all tokens match).
     """
-    __slots__ = ("isMatch", "data", "nodes")
+    __slots__ = ("is_match", "data", "nodes")
 
     def __init__(self, is_match=None, data=None, nodes=None):
-        self.isMatch = is_match
+        self.is_match = is_match
         self.data = data
         self.nodes = nodes
 
-    def __repr__(self):
-        nodes = self.nodes
+    @staticmethod
+    def dict_repr(nodes):
         if nodes is not None:
-            nodes = [(t, n) for t, n in nodes.items()]
+            return str([(t, n) for t, n in nodes.items()])
+
+    def __repr__(self):
+        nodes = Node.dict_repr(self.nodes)
         return f"Node(is_match={self.is_match},data={self.data},nodes={nodes})"
 
 
@@ -59,18 +66,19 @@ class TokenMatcher:
         :param matcherdata: data to add to all matches in the matcherdata field
         :param defaultdata: data to add to matches when the entry data is None
         """
-        self._dict = defaultdict(Node)
+        self.nodes = defaultdict(Node)
         self.ignorefunc = ignorefunc
         self.mapfunc = mapfunc
         self.defaultdata = defaultdata
         self.matcherdata = matcherdata
 
-    def add(self, entry, data=None):
+    def add(self, entry, data=None, append=False):
         """
         Add a gazetteer entry. If the same entry already exsits, the data is replaced with the new data.
         If all elements of the entry are ignored, nothing is done.
         :param entry: a string or iterable of string.
         :param data: the data to add for that gazetteer entry.
+        :param append: if true and data is not None, store data in a list and append any new data
         :return:
         """
         if isinstance(entry, str):
@@ -83,7 +91,7 @@ class TokenMatcher:
             if self.ignorefunc is not None and self.ignorefunc(token):
                 continue
             if i == 0:
-                node = self._dict[token]
+                node = self.nodes[token]
             else:
                 if node.nodes is None:
                     node.nodes = defaultdict(Node)
@@ -93,15 +101,23 @@ class TokenMatcher:
                 else:
                     node = node.nodes[token]
             i += 1
-        node.data = data
-        node.isMatch = True
+        if append and data:
+            if node.data:
+                node.data.append(data)
+            else:
+                node.data = [data]
+                node.is_match = True
+        else:
+            node.data = data
+            node.is_match = True
 
-    def find(self, tokens, all=True, fromidx=None, toidx=None):
+    def find(self, tokens, all=False, skip=True, fromidx=None, toidx=None):
         """
         Find gazetteer entries in text. Text is either a string or an iterable of strings or
         an iterable of elements where a string can be retrieved using the getter.
         :param tokens: iterable of tokens (string or something where getter retrieves a string)
-        :param all: return all matches, if False only return all longest matches
+        :param all: return all matches, if False only return longest match
+        :param skip: skip forward over longest match (do not return contained/overlapping matches)
         :param fromidx: index where to start finding in tokens
         :param toidx: index where to stop finding in tokens (this is the last index actually used)
         :return: an iterable of Match. The start/end fields of each Match are the character offsets if
@@ -109,18 +125,22 @@ class TokenMatcher:
         """
         matches = []
         l = len(tokens)
-        for i, token in enumerate(tokens):
+        i = 0
+        while i < l:
+            token = tokens[i]
             if self.mapfunc:
                 token = self.mapfunc(token)
-            if token in self._dict:  # only possible if the token was not ignored!
-                node = self._dict[token]
+            if token in self.nodes:  # only possible if the token was not ignored!
+                longest = 0
+                node = self.nodes[token]
                 thismatches = []
                 thistokens = []
-                if node.isMatch:
+                if node.is_match:
+                    longest = 1
                     thistokens.append(token)
                     thismatches.append(
                         Match([token], i, i+1, thisorthat(node.data, self.defaultdata), self.matcherdata))
-                j = j+1  # index into text tokens
+                j = i+1  # index into text tokens
                 while j < l:
                     if node.nodes:
                         tok = tokens[j]
@@ -134,32 +154,37 @@ class TokenMatcher:
                             node = node.nodes[tok]
                             thistokens.append(tok)
                             if node.is_match:
+                                longest = len(thistokens)
                                 thismatches.append(
                                     Match(thistokens, i, i + len(thistokens),
                                           thisorthat(node.data, self.defaultdata), self.matcherdata))
                             continue
                         else:
                             break
+                    else:
+                        break
                 for m in thismatches:
-                    matches.append(m)
+                    if all:
+                        matches.append(m)
+                    else:
+                        if (m.end - m.start) == longest:
+                            matches.append(m)
+                if skip:
+                    i += longest - 1  # we will increment by 1 right after!
+            i += 1
         return matches
-
-
-
-    def str_debug(self):
-        return self._dict
 
 
 if __name__ == "__main__":
     # quick tests
-    entries = ["Some", "word", "to", "add", ["some", "word"]]
+    entries = ["Some", "word", "to", "add", ["some", "word"], ["some", "word"]]
     tm = TokenMatcher(mapfunc=str.lower, matcherdata={"a": 23})
-    print("Empty: ", tm.str_debug())
+    print("Empty: ", Node.dict_repr(tm.nodes))
     for i, e in enumerate(entries):
-        tm.add(e, data=i)
-        print(f"After {i}: ", tm.str_debug())
+        tm.add(e, data=i, append=True)
+        print(f"After {i}: ", Node.dict_repr(tm.nodes))
 
-    #t1 = ["This", "contains", "Some", "text"]
-    #print("M1: ", tm.find(t1))
-    #t2 = ["this", "contains", "some", "word", "of", "text", "to", "add"]
-    #print("M2: ", tm.find(t2))
+    t1 = ["This", "contains", "Some", "text"]
+    print("M1: ", tm.find(t1))
+    t2 = ["this", "contains", "some", "word", "of", "text", "to", "add"]
+    print("M2: ", tm.find(t2, all=False, skip=True))
