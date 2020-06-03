@@ -15,8 +15,17 @@ parameter.
 
 from collections import namedtuple, defaultdict
 from .utils import thisorthat
+from dataclasses import dataclass
 
-Match = namedtuple("Match", ["match", "start", "end", "entrydata", "matcherdata"])
+
+@dataclass(unsafe_hash=True, order=True)
+class Match:
+    __slots__ = ("start", "end", "match", "entrydata", "matcherdata")
+    start: int
+    end: int
+    match: list
+    entrydata: object
+    matcherdata: object
 
 
 class Node(object):
@@ -138,7 +147,7 @@ class TokenMatcher:
                     longest = 1
                     thistokens.append(token)
                     thismatches.append(
-                        Match([token], i, i+1, thisorthat(node.data, self.defaultdata), self.matcherdata))
+                        Match(i, i+1, [token], thisorthat(node.data, self.defaultdata), self.matcherdata))
                 j = i+1  # index into text tokens
                 while j < l:
                     if node.nodes:
@@ -155,7 +164,8 @@ class TokenMatcher:
                             if node.is_match:
                                 longest = len(thistokens)
                                 thismatches.append(
-                                    Match(thistokens, i, i + len(thistokens),
+                                    Match(i, i + len(thistokens),
+                                          thistokens,
                                           thisorthat(node.data, self.defaultdata), self.matcherdata))
                             continue
                         else:
