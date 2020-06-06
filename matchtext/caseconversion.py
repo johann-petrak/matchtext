@@ -5,10 +5,19 @@ for the str.upper() str.title() and str.lower() methods. For example, "ß".upper
 "SS" and  "ς".upper() is mapped to "Σ", while "Σ".lower() is mapped to "σ".
 However, there are a few exceptions: in the Turkish and Azeri languages, the uppercase of "i" should be
 "İ", not "I" and the lowercase of "I" should be "ı" not "i".
+
 This module provides case mappers for the two languages described in the "Special Casing" Unicode
 documentation: https://www.unicode.org/Public/UNIDATA/SpecialCasing.txt
+
 NOTE: this does not implement title() as title-case conversion is more subtle anyway (e.g.
 no upper case after an apostrophe inside a word except it is part of a proper name).
+
+NOTE: another way to do this is by using the PyICU package:
+```
+from icu import UnicodeString, Locale
+str(UnicodeString("i").toUpper(Locale("TR")))
+str(UnicodeString("i").toUpper(Locale("EN")))
+```
 """
 
 CC_OGONEK = "\u0328"

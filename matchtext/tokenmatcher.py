@@ -13,10 +13,10 @@ data and append on each add for the same sequence instead of overwriting existin
 parameter.
 """
 
-from collections import namedtuple, defaultdict
-from .utils import thisorthat
+from collections import defaultdict
+from matchtext.utils import thisorthat
 from dataclasses import dataclass
-
+from matchtext.runutils import ensurelogger, set_logger
 
 @dataclass(unsafe_hash=True, order=True)
 class Match:
@@ -121,6 +121,8 @@ class TokenMatcher:
         :return: an iterable of Match. The start/end fields of each Match are the character offsets if
         text is a string, otherwise are the token offsets.
         """
+        logger = ensurelogger()
+        logger.debug("CALL")
         matches = []
         l = len(tokens)
         if fromidx is None:
@@ -134,22 +136,26 @@ class TokenMatcher:
         if fromidx > toidx:
             return matches
         i = fromidx
+        logger.debug(f"From index {i} to index {toidx} for {tokens}")
         while i <= toidx:
             token = tokens[i]
+            logger.debug(f"Check token {i}={token}")
             if self.mapfunc:
                 token = self.mapfunc(token)
             if token in self.nodes:  # only possible if the token was not ignored!
                 longest = 0
                 node = self.nodes[token]
+                logger.debug(f"Got a first token match for {token}")
                 thismatches = []
-                thistokens = []
+                thistokens = [token]
                 if node.is_match:
+                    logger.debug(f"First token match is also entry match")
                     longest = 1
-                    thistokens.append(token)
                     thismatches.append(
-                        Match(i, i+1, [token], thisorthat(node.data, self.defaultdata), self.matcherdata))
+                        Match(i, i+1, thistokens.copy(), thisorthat(node.data, self.defaultdata), self.matcherdata))
                 j = i+1  # index into text tokens
-                while j < l:
+                while j <= toidx:
+                    logger.debug(f"j={j}")
                     if node.nodes:
                         tok = tokens[j]
                         if self.mapfunc:
@@ -158,29 +164,35 @@ class TokenMatcher:
                             j += 1
                             continue
                         if tok in node.nodes:
-                            j += 1
+                            logger.debug(f"Found token {tok}")
                             node = node.nodes[tok]
                             thistokens.append(tok)
                             if node.is_match:
+                                logger.debug(f"Also is entry match")
                                 longest = len(thistokens)
                                 thismatches.append(
                                     Match(i, i + len(thistokens),
-                                          thistokens,
+                                          thistokens.copy(),
                                           thisorthat(node.data, self.defaultdata), self.matcherdata))
+                            j += 1
                             continue
                         else:
+                            logger.debug(f"Breaking: {tok} does not match, j={j}")
                             break
                     else:
+                        logger.debug("Breaking: no nodes")
                         break
+                logger.debug(f"Going through thismatches: {thismatches}")
                 for m in thismatches:
                     if all:
                         matches.append(m)
                     else:
                         if (m.end - m.start) == longest:
                             matches.append(m)
-                if skip:
+                if thismatches and skip:
                     i += longest - 1  # we will increment by 1 right after!
             i += 1
+            logger.debug(f"Incremented i to {i}")
         return matches
 
     def replace(self,  tokens, fromidx=None, toidx=None, getter=None):
@@ -206,3 +218,20 @@ class TokenMatcher:
                 rep = [match.entrydata]
             tokens[match.start:match.end] = rep
         return tokens
+
+
+# for quick debugging, replace with __main__
+if __name__ =="__mainX__":
+    tm = TokenMatcher()
+    tm.add(["this", "and", "that"], "ENTRY1")
+    tm.add(["she", "and", "he"], "ENTRY2")
+    tm.add(["other", "stuff"], "ENTRY3")
+    logger = set_logger(None)
+    print("DEBUG: no:", tm.replace(["and", "also"]))
+    print("DEBUG: yes:", tm.replace(["because", "this", "and", "that", "should", "also"]))
+    print("DEBUG: yes:", tm.replace(["other", "stuff"]))
+    print("DEBUG: yes:", tm.replace(["and", "other", "stuff"]))
+    print("DEBUG: not:", tm.replace(["word1", "word2", "other", "word3"]))
+    print("DEBUG: not:", tm.replace(["word1", "word2", "stuff", "word3"]))
+    print("DEBUG: not:", tm.replace(["word1", "word2", "and", "word3"]))
+    print("DEBUG: yes:", tm.replace(["this", "and", "that", "other", "stuff"]))

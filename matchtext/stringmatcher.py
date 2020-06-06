@@ -6,6 +6,7 @@ the start and/or the end of an entry.
 
 from collections import namedtuple, defaultdict
 from .utils import thisorthat
+from .ahocorapy.keywordtree import KeywordTree
 
 Match = namedtuple("Match", ["match", "start", "end", "entrydata", "matcherdata"])
 
@@ -26,6 +27,7 @@ class StringMatcher:
         self.mapfunc = mapfunc
         self.defaultdata = defaultdata
         self.matcherdata = matcherdata
+        self.kwtree = KeywordTree()
 
     def add(self, entry, data=None, append=False):
         """
@@ -36,7 +38,8 @@ class StringMatcher:
         :param append: if true and data is not None, store data in a list and append any new data
         :return:
         """
-        raise Exception("Not yet implemented")
+        if self.k
+        self.kwtree.add(entry, data)
 
     def find(self, text, all=False, skip=True, fromidx=None, toidx=None):
         """
