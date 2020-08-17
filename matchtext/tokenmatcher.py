@@ -13,10 +13,12 @@ data and append on each add for the same sequence instead of overwriting existin
 parameter.
 """
 
+import sys
 from collections import defaultdict
 from matchtext.utils import thisorthat
 from dataclasses import dataclass
 from matchtext.runutils import ensurelogger, set_logger
+
 
 @dataclass(unsafe_hash=True, order=True)
 class Match:
@@ -38,6 +40,12 @@ class Node(object):
     __slots__ = ("is_match", "data", "nodes")
 
     def __init__(self, is_match=None, data=None, nodes=None):
+        """
+
+        :param is_match: this node is a match
+        :param data: data associated with the match
+        :param nodes:
+        """
         self.is_match = is_match
         self.data = data
         self.nodes = nodes
@@ -68,13 +76,15 @@ class TokenMatcher:
         self.defaultdata = defaultdata
         self.matcherdata = matcherdata
 
-    def add(self, entry, data=None, append=False):
+    def add(self, entry, data=None, append=False, listdata=None):
         """
-        Add a gazetteer entry. If the same entry already exsits, the data is replaced with the new data.
+        Add a gazetteer entry. If the same entry already exsists, the data is replaced with the new data.
         If all elements of the entry are ignored, nothing is done.
+
         :param entry: a string or iterable of string.
         :param data: the data to add for that gazetteer entry.
         :param append: if true and data is not None, store data in a list and append any new data
+        :param listdata: list data for the gazetteer entry
         :return:
         """
         if isinstance(entry, str):
@@ -107,7 +117,7 @@ class TokenMatcher:
             node.data = data
             node.is_match = True
 
-    def find(self, tokens, all=False, skip=True, fromidx=None, toidx=None):
+    def find(self, tokens, all=False, skip=True, fromidx=None, toidx=None, getter=None, matchmaker=None):
         """
         Find gazetteer entries in text. Text is either a string or an iterable of strings or
         an iterable of elements where a string can be retrieved using the getter.
@@ -118,6 +128,7 @@ class TokenMatcher:
         :param skip: skip forward over longest match (do not return contained/overlapping matches)
         :param fromidx: index where to start finding in tokens
         :param toidx: index where to stop finding in tokens (this is the last index actually used)
+        :param getter: get the string from a token object, if None, assumes each token already is a string
         :return: an iterable of Match. The start/end fields of each Match are the character offsets if
         text is a string, otherwise are the token offsets.
         """
@@ -138,7 +149,11 @@ class TokenMatcher:
         i = fromidx
         logger.debug(f"From index {i} to index {toidx} for {tokens}")
         while i <= toidx:
-            token = tokens[i]
+            token_obj = tokens[i]
+            if getter:
+                token = getter(token_obj)
+            else:
+                token = token_obj
             logger.debug(f"Check token {i}={token}")
             if self.mapfunc:
                 token = self.mapfunc(token)
@@ -151,9 +166,13 @@ class TokenMatcher:
                 if node.is_match:
                     logger.debug(f"First token match is also entry match")
                     longest = 1
-                    thismatches.append(
-                        Match(i, i+1, thistokens.copy(), thisorthat(node.data, self.defaultdata), self.matcherdata))
+                    if matchmaker:
+                        match = matchmaker(i, i+1, thistokens.copy(), thisorthat(node.data, self.defaultdata), self.matcherdata)
+                    else:
+                        match = Match(i, i+1, thistokens.copy(), thisorthat(node.data, self.defaultdata), self.matcherdata)
+                    thismatches.append(match)
                 j = i+1  # index into text tokens
+                nignored = 0
                 while j <= toidx:
                     logger.debug(f"j={j}")
                     if node.nodes:
@@ -162,6 +181,7 @@ class TokenMatcher:
                             tok = self.mapfunc(tok)
                         if self.ignorefunc and self.ignorefunc(tok):
                             j += 1
+                            nignored += 1
                             continue
                         if tok in node.nodes:
                             logger.debug(f"Found token {tok}")
@@ -169,11 +189,23 @@ class TokenMatcher:
                             thistokens.append(tok)
                             if node.is_match:
                                 logger.debug(f"Also is entry match")
-                                longest = len(thistokens)
-                                thismatches.append(
-                                    Match(i, i + len(thistokens),
+                                if matchmaker:
+                                    match = matchmaker(i, i + len(thistokens)+nignored,
                                           thistokens.copy(),
-                                          thisorthat(node.data, self.defaultdata), self.matcherdata))
+                                          thisorthat(node.data, self.defaultdata), self.matcherdata)
+                                else:
+                                    match = Match(i, i + len(thistokens)+nignored,
+                                          thistokens.copy(),
+                                          thisorthat(node.data, self.defaultdata), self.matcherdata)
+                                # TODO: should LONGEST get calculated including ignored tokens or not?
+                                if all:
+                                    thismatches.append(match)
+                                    if len(thistokens) > longest:
+                                        longest = len(thistokens)
+                                else:
+                                    if len(thistokens) > longest:
+                                        thismatches = [match]
+                                        longest = len(thistokens)
                             j += 1
                             continue
                         else:
@@ -184,54 +216,40 @@ class TokenMatcher:
                         break
                 logger.debug(f"Going through thismatches: {thismatches}")
                 for m in thismatches:
-                    if all:
-                        matches.append(m)
-                    else:
-                        if (m.end - m.start) == longest:
-                            matches.append(m)
+                    matches.append(m)
                 if thismatches and skip:
                     i += longest - 1  # we will increment by 1 right after!
             i += 1
             logger.debug(f"Incremented i to {i}")
         return matches
 
-    def replace(self,  tokens, fromidx=None, toidx=None, getter=None):
+    def replace(self,  tokens, fromidx=None, toidx=None, getter=None, replacer=None, matchmaker=None):
         """
         Replace any longest sequence of tokens we find. By default the data found for the match is
-        used as is. The getter parameter can be used to specify a function that takes the
-        match and returns a list of replacement tokens. If the getter is a list, that list is always used
-        as a replacement. If the getter is a string, it is used as a single token string that is always used.
+        used as is.
+
+        The getter function is used for finding matching to access the string from an individuak token object.
+
+        The replacer parameter can be used to specify a function that takes the
+        match and returns a list of replacement tokens. If the replacer is a list, that list is always used
+        as a replacement. If the replacer is a string, it is used as a single token string that is always used.
+
         :param tokens: the sequence of tokens where to find and replace matches. The parameter is left unchanged.
         :param fromidx:
         :param toidx:
-        :param getter: a function that takes the match and returns a list of replacement tokens
+        :param getter: a function that takes a token from tokens and returns the corresponding string
+        :param replacer: a function that takes a match and returns a list of tokens to replace the matched tokens with
+        :param matchmaker: a function to create a match object, passed on to the finder.
         :return: the tokens with all replacements carried out
         """
         tokens = tokens.copy()
-        matches = self.find(tokens, fromidx=fromidx, toidx=toidx, all=False, skip=True)
+        matches = self.find(tokens, fromidx=fromidx, toidx=toidx, all=False, skip=True, getter=getter, matchmaker=matchmaker)
         # to make it easier to replace slices in the tokens, replace from the end
         matches = sorted(matches, key=lambda x: x.start, reverse=True)
         for match in matches:
-            if getter:
-                rep = getter(match)
+            if replacer:
+                rep = replacer(match)
             else:
                 rep = [match.entrydata]
             tokens[match.start:match.end] = rep
         return tokens
-
-
-# for quick debugging, replace with __main__
-if __name__ =="__mainX__":
-    tm = TokenMatcher()
-    tm.add(["this", "and", "that"], "ENTRY1")
-    tm.add(["she", "and", "he"], "ENTRY2")
-    tm.add(["other", "stuff"], "ENTRY3")
-    logger = set_logger(None)
-    print("DEBUG: no:", tm.replace(["and", "also"]))
-    print("DEBUG: yes:", tm.replace(["because", "this", "and", "that", "should", "also"]))
-    print("DEBUG: yes:", tm.replace(["other", "stuff"]))
-    print("DEBUG: yes:", tm.replace(["and", "other", "stuff"]))
-    print("DEBUG: not:", tm.replace(["word1", "word2", "other", "word3"]))
-    print("DEBUG: not:", tm.replace(["word1", "word2", "stuff", "word3"]))
-    print("DEBUG: not:", tm.replace(["word1", "word2", "and", "word3"]))
-    print("DEBUG: yes:", tm.replace(["this", "and", "that", "other", "stuff"]))
