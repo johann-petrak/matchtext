@@ -201,9 +201,11 @@ class StringMatcher:
             return text
         parts = []
         last = 0
+        # print(f"\n!!!!!!!!DEBUG: matches = {matches}")
         for match in matches:
             if match.start > last:
                 parts.append(text[last:match.start])
+            if match.start >= last:
                 if replacer:
                     rep = replacer(match)
                 else:
@@ -212,4 +214,5 @@ class StringMatcher:
                 last = match.end
         if last < len(text):
             parts.append(text[last:])
+        # print(f"\n!!!!!!!!DEBUG: parts = {parts}")
         return "".join(parts)
