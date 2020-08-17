@@ -3,7 +3,7 @@
 Match strings by character: match entries character by character, optionally only at word boundaries at
 the start and/or the end of an entry.
 """
-
+import sys
 from .utils import thisorthat
 from matchtext.runutils import ensurelogger, set_logger
 from dataclasses import dataclass
@@ -30,6 +30,16 @@ class _Node:
     def __init__(self):
         self.children = dict()
         self.value = _NOVALUE
+
+    def print_node(self, file=sys.stderr):
+        if self.value == _NOVALUE:
+            print(f"Node(val=,children=[", end="", file=file)
+        else:
+            print(f"Node(val={self.value},children=[",end="", file=file)
+        for c, n in self.children.items():
+            print(f"{c}:", end="",file=file)
+            n.print_node()
+        print("])", end="", file=file)
 
 
 class StringMatcher:
@@ -71,6 +81,9 @@ class StringMatcher:
             entry = [entry]
         for e in entry:
             node = self._get_node(e, create=True)
+            if node == self._root:
+                # empty string not allowed
+                continue
             if node.value == _NOVALUE:
                 if append:
                     node.value = [data]
@@ -141,11 +154,19 @@ class StringMatcher:
                         if cur_len > longest_len:
                             longest_len = cur_len
                             longest_match = match
-                k += 1
+                while True:
+                    k += 1
+                    if i+k >= len(text):
+                        break
+                    chr = text[i+k]
+                    if self.ignorefunc and self.ignorefunc(chr):
+                        continue
+                    if self.mapfunc:
+                        chr = self.mapfunc(chr)
+                    node = node.children.get(chr)
+                    break
                 if i+k >= len(text):
                     break
-                chr = text[i+k]
-                node = node.children.get(chr)
             if not all and longest_match is not None:
                 matches.append(longest_match)
             if skip:
@@ -184,6 +205,11 @@ class StringMatcher:
         """
         node = self._root
         for el in item:
+            if self.ignorefunc and self.ignorefunc(el):
+                print(f"???????????????? IGNORING {el}")
+                continue
+            if self.mapfunc:
+                el = self.mapfunc(el)
             if create:
                 node = node.children.setdefault(el, _Node())
             else:

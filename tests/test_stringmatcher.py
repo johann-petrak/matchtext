@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
 
 from matchtext.stringmatcher import StringMatcher
+import sys
 
 
 def test_sm_find1():
     sm = StringMatcher()
     for i, e in enumerate(["this", "word", "words", "thisis", "his"]):
         sm.add(e, data=i, append=False)
-
+    assert sm["this"] == 0
+    assert sm["his"] == 4
+    assert sm.get("this") == 0
+    assert sm.get("asasas", "x") == "x"
+    assert sm.get("asaasa") is None
     t1 = "this is a word"
     ms1 = sm.find(t1, all=True, skip=True)
     assert len(ms1) == 2
@@ -74,7 +79,8 @@ def test_sm_find3():
     assert m4.match == "word"
     assert m4.start == 9
 
-def test_sm_find3():
+
+def test_sm_find4():
     sm = StringMatcher()
     for i, e in enumerate(["this", "word", "words", "thisis", "his"]):
         sm.add(e, data=i, append=False)
@@ -91,6 +97,51 @@ def test_sm_find3():
     assert m2.match == "word"
     assert m2.start == 9
 
+
+def test_sm_find5():
+    sm = StringMatcher()
+    for i, e in enumerate(["this", "word", "words", "thisis", "his", "word"]):
+        sm.add(e, data=i, append=True)
+
+    t1 = "thisis a word"
+    ms1 = sm.find(t1, all=False, skip=True)
+    assert len(ms1) == 2
+    m1 = ms1[0]
+    assert m1.entrydata == [3]
+    assert m1.match == "thisis"
+    assert m1.start == 0
+    m2 = ms1[1]
+    assert m2.entrydata == [1, 5]
+    assert m2.match == "word"
+    assert m2.start == 9
+
+
+def test_sm_find6():
+    def f_ign(x):
+        return x in "io"
+    sm = StringMatcher(ignorefunc=f_ign)
+    for i, e in enumerate(["this", "word", "words", "thisis", "his", "word"]):
+        sm.add(e, data=i, append=True)
+    print(f"!!!!!!!!!!!DEBUG: nodes: ", file=sys.stderr)
+    sm._root.print_node()
+    print(file=sys.stderr)
+    # In the following "thoss" should match because o gets ignored and and i got ignored for "thisis" so
+    # we really match "thss"
+    t1 = "thoss a wrd"
+    ms1 = sm.find(t1, all=False, skip=True)
+    print(f"!!!!!!DEBUG: matches={ms1}")
+    assert len(ms1) == 2
+    m1 = ms1[0]
+    assert m1.entrydata == [3]
+    assert m1.match == "thoss"
+    assert m1.start == 0
+    assert m1.end == 5
+    m2 = ms1[1]
+    assert m2.entrydata == [1, 5]
+    assert m2.match == "wrd"
+    assert m2.start == 8
+
+
 def test_sm_replace1():
     sm = StringMatcher()
     for i, e in enumerate(["this", "word", "words", "thisis", "his"]):
@@ -98,3 +149,4 @@ def test_sm_replace1():
     t1 = "thisis a word"
     rep = sm.replace(t1)
     assert rep == "3 a 1"
+
