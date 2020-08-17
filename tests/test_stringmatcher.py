@@ -122,14 +122,14 @@ def test_sm_find6():
     sm = StringMatcher(ignorefunc=f_ign)
     for i, e in enumerate(["this", "word", "words", "thisis", "his", "word"]):
         sm.add(e, data=i, append=True)
-    print(f"!!!!!!!!!!!DEBUG: nodes: ", file=sys.stderr)
-    sm._root.print_node()
-    print(file=sys.stderr)
+    #print(f"!!!!!!!!!!!DEBUG: nodes: ", file=sys.stderr)
+    #sm._root.print_node()
+    #print(file=sys.stderr)
+
     # In the following "thoss" should match because o gets ignored and and i got ignored for "thisis" so
     # we really match "thss"
-    t1 = "thoss a wrd"
+    t1 = "thoss a wiiiiiiiird"
     ms1 = sm.find(t1, all=False, skip=True)
-    print(f"!!!!!!DEBUG: matches={ms1}")
     assert len(ms1) == 2
     m1 = ms1[0]
     assert m1.entrydata == [3]
@@ -138,8 +138,9 @@ def test_sm_find6():
     assert m1.end == 5
     m2 = ms1[1]
     assert m2.entrydata == [1, 5]
-    assert m2.match == "wrd"
+    assert m2.match == "wiiiiiiiird"
     assert m2.start == 8
+    assert m2.end == 19
 
 
 def test_sm_replace1():

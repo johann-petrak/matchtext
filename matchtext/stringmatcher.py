@@ -31,7 +31,8 @@ class _Node:
         self.children = dict()
         self.value = _NOVALUE
 
-    def print_node(self, file=sys.stderr):
+    # Will get removed or replaced with a proper pretty-printer!
+    def debug_print_node(self, file=sys.stderr):
         if self.value == _NOVALUE:
             print(f"Node(val=,children=[", end="", file=file)
         else:
@@ -123,7 +124,6 @@ class StringMatcher:
             return matches
         i = fromidx
         logger.debug(f"From index {i} to index {toidx} for {text}")
-        print(f"From index {i} to index {toidx} for {text}")
         while i < toidx:
             chr = text[i]
             if self.ignorefunc and self.ignorefunc(chr):
@@ -136,11 +136,8 @@ class StringMatcher:
             node = self._root
             node = node.children.get(chr)
             k = 0
-            print(f"Checking index {i}: {node}")
             while node is not None:
-                print(f"Have node {i}+{k}: {node}")
                 if node.value != _NOVALUE:
-                    print(f"Got a node with a value at {i}+{k}")
                     # we found a match
                     cur_len = k+1
                     if matchmaker:
@@ -206,7 +203,6 @@ class StringMatcher:
         node = self._root
         for el in item:
             if self.ignorefunc and self.ignorefunc(el):
-                print(f"???????????????? IGNORING {el}")
                 continue
             if self.mapfunc:
                 el = self.mapfunc(el)
@@ -227,7 +223,6 @@ class StringMatcher:
             return text
         parts = []
         last = 0
-        # print(f"\n!!!!!!!!DEBUG: matches = {matches}")
         for match in matches:
             if match.start > last:
                 parts.append(text[last:match.start])
@@ -240,5 +235,4 @@ class StringMatcher:
                 last = match.end
         if last < len(text):
             parts.append(text[last:])
-        # print(f"\n!!!!!!!!DEBUG: parts = {parts}")
         return "".join(parts)
